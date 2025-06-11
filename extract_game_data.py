@@ -18,41 +18,49 @@ def extract_pbp_data(json):
         A DataFrame containing the play by play data for a specific game
 
     """
-    pbp_data = json['pbp']
-    pbp_df = pd.json_normalize(pbp_data)
 
-    pbp_df = pbp_df.clean_names(case_type="snake")
-    pbp_df = pbp_df.drop(columns= ['scoreboard_name'])
-    pbp_df = pbp_df.rename(columns={'player' : 'scoreboard_name'})
+    # Extract and normalize play-by-play data
+    pbp_df = pd.json_normalize(json['pbp']).clean_names(case_type="snake")
+    
+    # Clean and rename columns
+    pbp_df = pbp_df.drop(columns= ['scoreboard_name']).rename(columns={'player' : 'scoreboard_name'})
     pbp_df['player'] = pbp_df['first_name'] + ' ' + pbp_df['family_name']
     pbp_df['game_id'] = json['game_id']
 
+    # Expand qualifier column into seperate columns
     qualifier_df = pd.DataFrame(pbp_df['qualifier'].tolist()).add_prefix('qualifier_')
     pbp_df = pd.concat([pbp_df.drop(columns=['qualifier']), qualifier_df], axis=1)
 
-    shot_data_one = json['tm']['1']['shot']
-    shot_data_two = json['tm']['2']['shot']
-    shot_df_one = pd.json_normalize(shot_data_one)
-    shot_df_two = pd.json_normalize(shot_data_two)
-    shot_df = pd.concat([shot_df_one, shot_df_two], ignore_index=True)
+    # Extract and combine shot data from both teams
+    shot_df_team1 = pd.json_normalize(json['tm']['1']['shot']).clean_names(case_type="snake")
+    shot_df_team2 = pd.json_normalize(json['tm']['2']['shot']).clean_names(case_type="snake")
+    shot_df = pd.concat([shot_df_team1, shot_df_team2], ignore_index=True)
 
-    shot_df = shot_df.clean_names(case_type="snake")
+    # Merge shot coordinates with play-by-play data
     pbp_df = pbp_df.merge(
         shot_df[["action_number", "x", "y"]],
         on="action_number",
         how="left"
     )
 
-    pbp_df = pbp_df.fillna(pd.NA)
-    pbp_df = pbp_df.replace({None: pd.NA})
-    pbp_df = pbp_df.rename(columns={
+    # Clean null values and rename final columns
+    pbp_df = pbp_df.fillna(pd.NA).replace({None: pd.NA, "": pd.NA})
+    
+    column_mapping = {
         "gt": "game_time",
         "s1": "home_score",
         "s2": "away_score",
         "lead": "home_lead",
         "tno": "team_id",
         "pno": "player_id",
-    })
+    }
+    pbp_df = pbp_df.rename(columns=column_mapping)
+
+    # Convert data types
+    dtype_mapping = {
+        'game_id': int,
+    }
+    pbp_df = pbp_df.astype(dtype_mapping)
 
     return pbp_df
 
@@ -70,10 +78,18 @@ def extract_official_data(json):
     pd.DataFrame
         A DataFrame containing the official data for a specific game
     """
-    official_data = json['officials']
-    official_df = pd.json_normalize(official_data.values())
-    official_df = official_df.clean_names(case_type="snake")
+
+    # Extract and normalize official data
+    official_df = pd.json_normalize(json['officials'].values()).clean_names(case_type="snake")
     official_df['game_id'] = json['game_id']
+
+    # Convert data types
+    dtype_mapping = {
+        'game_id': int,
+    }
+    pbp_df = pbp_df.astype(dtype_mapping)
+
+    return official_df
 
 def extract_player_data(json):
     """
@@ -179,18 +195,82 @@ def extract_team_data(json):
     pd.DataFrame
         A DataFrame containing the team data for a specific game
     """
+
+    # Extract and clean team data for both teams
     team_data_one = json['tm']['1']
     team_data_two = json['tm']['2']
-
+    
+    # Keys to exclude from team data
     keys_to_remove = ['coachDetails', 'assistcoach1Details', 'assistcoach2Details', 'pl', 'shot', 'scoring', 'lds']
     for key in keys_to_remove:
         team_data_one.pop(key, None)  # avoids KeyError if key doesn't exist
         team_data_two.pop(key, None)
 
+    # Normalize and combine team data
     team_df_one = pd.json_normalize(team_data_one)
     team_df_two = pd.json_normalize(team_data_two)
-
-    team_df['game_id'] = json['game_id']  
     team_df = pd.concat([team_df_one, team_df_two], ignore_index=True)
+
+    # Clean columns and add game ID
     team_df = team_df.clean_names(case_type="snake")
+    team_df['game_id'] = json['game_id']
+
+    # Column renaming mapping
+    column_mapping = {
+        'tot_s_field_goals_made': 'field_goals_made',
+        'tot_s_field_goals_attempted': 'field_goals_attempted',
+        'tot_s_field_goals_percentage': 'field_goal_percentage',
+        'tot_s_three_pointers_made': 'three_point_field_goals_made',
+        'tot_s_three_pointers_attempted': 'three_point_field_goals_attempted',
+        'tot_s_three_pointers_percentage': 'three_point_percentage',
+        'tot_s_two_pointers_made': 'two_point_field_goals_made',
+        'tot_s_two_pointers_attempted': 'two_point_field_goals_attempted',
+        'tot_s_two_pointers_percentage': 'two_point_percentage',
+        'tot_s_free_throws_made': 'free_throws_made',
+        'tot_s_free_throws_attempted': 'free_throws_attempted',
+        'tot_s_free_throws_percentage': 'free_throw_percentage',
+        'tot_s_rebounds_defensive': 'rebounds_defensive',
+        'tot_s_rebounds_offensive': 'rebounds_offensive',
+        'tot_s_rebounds_total': 'rebounds',
+        'tot_s_assists': 'assists',
+        'tot_s_turnovers': 'turnovers',
+        'tot_s_steals': 'steals',
+        'tot_s_blocks': 'blocks',
+        'tot_s_blocks_received': 'blocks_received',
+        'tot_s_fouls_personal': 'fouls_personal',
+        'tot_s_fouls_on': 'fouls_drawn',
+        'tot_s_fouls_total': 'fouls_total',
+        'tot_s_points': 'points',
+        'tot_s_points_from_turnovers': 'points_from_turnovers',
+        'tot_s_points_second_chance': 'points_second_chance',
+        'tot_s_points_fast_break': 'points_fast_break',
+        'tot_s_bench_points': 'points_bench',
+        'tot_s_points_in_the_paint': 'points_in_the_paint',
+        'tot_s_time_leading': 'time_leading',
+        'tot_s_biggest_lead': 'biggest_lead',
+        'tot_s_biggest_scoring_run': 'biggest_scoring_run',
+        'tot_s_lead_changes': 'lead_changes',
+        'tot_s_times_scores_level': 'times_scores_level',
+        'tot_s_fouls_team': 'team_fouls',
+        'tot_s_rebounds_team': 'team_rebounds',
+        'tot_s_rebounds_team_defensive': 'team_rebounds_defensive',
+        'tot_s_rebounds_team_offensive': 'team_rebounds_offensive',
+        'tot_s_turnovers_team': 'team_turnovers',
+    }
+    
+    # Apply column renaming
+    team_df = team_df.rename(columns=column_mapping)
+
+    # Data type conversions
+    dtype_mapping = {
+        'game_id': int,
+        'tot_eff_1': float,
+        'tot_eff_2': float,
+        'tot_eff_3': float,
+        'tot_eff_4': float,
+        'tot_eff_5': float,
+        'tot_eff_6': float,
+        'tot_eff_7': float,
+    }
+
     return team_df
