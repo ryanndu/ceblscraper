@@ -164,3 +164,33 @@ def extract_player_data(json):
     }
     player_df = player_df.astype(dtype_mapping)
     return player_df
+
+def extract_team_data(json):
+    """
+    Extract and clean team data from game JSON.
+
+    Parameters
+    ----------
+    json : dict
+        The JSON response containing the team data.
+    
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the team data for a specific game
+    """
+    team_data_one = json['tm']['1']
+    team_data_two = json['tm']['2']
+
+    keys_to_remove = ['coachDetails', 'assistcoach1Details', 'assistcoach2Details', 'pl', 'shot', 'scoring', 'lds']
+    for key in keys_to_remove:
+        team_data_one.pop(key, None)  # avoids KeyError if key doesn't exist
+        team_data_two.pop(key, None)
+
+    team_df_one = pd.json_normalize(team_data_one)
+    team_df_two = pd.json_normalize(team_data_two)
+
+    team_df['game_id'] = json['game_id']  
+    team_df = pd.concat([team_df_one, team_df_two], ignore_index=True)
+    team_df = team_df.clean_names(case_type="snake")
+    return team_df
