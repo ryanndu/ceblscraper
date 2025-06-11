@@ -5,7 +5,7 @@ import janitor
 
 def extract_pbp_data(json):
     """
-    Extracts the CEBL play by play data from JSON response.
+    Extracts the CEBL play by play data from JSON.
 
     Parameters
     ----------
@@ -25,6 +25,7 @@ def extract_pbp_data(json):
     pbp_df = pbp_df.drop(columns= ['scoreboard_name'])
     pbp_df = pbp_df.rename(columns={'player' : 'scoreboard_name'})
     pbp_df['player'] = pbp_df['first_name'] + ' ' + pbp_df['family_name']
+    pbp_df['game_id'] = json['game_id']
 
     qualifier_df = pd.DataFrame(pbp_df['qualifier'].tolist()).add_prefix('qualifier_')
     pbp_df = pd.concat([pbp_df.drop(columns=['qualifier']), qualifier_df], axis=1)
@@ -54,3 +55,22 @@ def extract_pbp_data(json):
     })
 
     return pbp_df
+
+def extract_official_data(json):
+    """
+    Extracts the CEBL official data from JSON.
+
+    Parameters
+    ----------
+    json : dict
+        The JSON response containing the official data.
+    
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the official data for a specific game
+    """
+    official_data = json['officials']
+    official_df = pd.json_normalize(official_data.values())
+    official_df = official_df.clean_names(case_type="snake")
+    official_df['game_id'] = json['game_id']
