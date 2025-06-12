@@ -87,7 +87,7 @@ def extract_official_data(json):
     dtype_mapping = {
         'game_id': int,
     }
-    pbp_df = pbp_df.astype(dtype_mapping)
+    official_df = official_df.astype(dtype_mapping)
 
     return official_df
 
@@ -274,3 +274,37 @@ def extract_team_data(json):
     }
 
     return team_df
+
+def extract_coach_data(json):
+    """
+    Extract and clean coach data from game JSON.
+
+    Parameters
+    ----------
+    json : dict
+        The JSON response containing the coach data.
+    
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the coach data for a specific game
+    """
+    coach_df = []
+    for team_num in ['1', '2']:
+        head_coach_data = json['tm'][team_num]['coachDetails']
+        assist_coach_1_data = json['tm'][team_num]['assistcoach1Details']
+        assist_coach_2_data = json['tm'][team_num]['assistcoach2Details']
+
+        head_coach_df = pd.json_normalize(head_coach_data)
+        assist_coach_1_df = pd.json_normalize(assist_coach_1_data)
+        assist_coach_2_df = pd.json_normalize(assist_coach_2_data)
+
+        coach_df.append(head_coach_df)
+        coach_df.append(assist_coach_1_df)
+        coach_df.append(assist_coach_2_df)
+
+    coach_df = pd.concat(coach_df, ignore_index=True)
+    coach_df = coach_df.clean_names(case_type="snake")
+    coach_df['head_coach'] = coach_df.index.isin([0, 3])
+
+    return coach_df
