@@ -341,22 +341,62 @@ def extract_coach_data(json):
     pd.DataFrame
         A DataFrame containing the coach data for a specific game
     """
-    coach_df = []
+    
+    coach_df_list = []
+    
+    # Extract coach data from both teams
     for team_num in ['1', '2']:
-        head_coach_data = json['tm'][team_num]['coachDetails']
-        assist_coach_1_data = json['tm'][team_num]['assistcoach1Details']
-        assist_coach_2_data = json['tm'][team_num]['assistcoach2Details']
-
-        head_coach_df = pd.json_normalize(head_coach_data)
-        assist_coach_1_df = pd.json_normalize(assist_coach_1_data)
-        assist_coach_2_df = pd.json_normalize(assist_coach_2_data)
-
-        coach_df.append(head_coach_df)
-        coach_df.append(assist_coach_1_df)
-        coach_df.append(assist_coach_2_df)
-
-    coach_df = pd.concat(coach_df, ignore_index=True)
+        team_data = json['tm'][team_num]
+        team_name = team_data['name']
+        
+        # Extract different coach types
+        coaches_data = [
+            (team_data['coachDetails'], 'Head Coach'),
+            (team_data['assistcoach1Details'], 'Assistant Coach'),
+            (team_data['assistcoach2Details'], 'Assistant Coach')
+        ]
+        
+        for coach_data, coach_type in coaches_data:
+            coach_record = pd.json_normalize(coach_data)
+            coach_record['team_name'] = team_name
+            coach_record['coach_type'] = coach_type
+            coach_df_list.append(coach_record)
+    
+    # Combine and clean
+    coach_df = pd.concat(coach_df_list, ignore_index=True)
     coach_df = coach_df.clean_names(case_type="snake")
-    coach_df['head_coach'] = coach_df.index.isin([0, 3])
-
+    
+    # Add game ID
+    coach_df['game_id'] = json['game_id']
+    
+    # Column renaming mapping
+    column_mapping = {
+        'family_name': 'last_name',
+        'family_name_initial': 'last_name_initial',
+        'international_family_name': 'international_last_name',
+        'international_family_name_initial': 'international_last_name_initial',
+    }
+    coach_df = coach_df.rename(columns=column_mapping)
+    
+    # Add coach full name
+    coach_df['coach_name'] = coach_df['first_name'] + ' ' + coach_df['last_name']
+    
+    # Convert data types
+    dtype_mapping = {
+        'game_id': int,
+    }
+    
+    for col, dtype in dtype_mapping.items():
+        coach_df[col] = coach_df[col].astype(dtype)
+    
+    # Reorder columns
+    column_order = [
+        'game_id', 'team_name', 'coach_name', 'coach_type',
+        'first_name', 'first_name_initial', 'last_name', 'last_name_initial',
+        'international_first_name', 'international_first_name_initial', 
+        'international_last_name', 'international_last_name_initial',
+        'scoreboard_name',
+    ]
+    coach_df = coach_df[column_order]
+    
     return coach_df
