@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import re
 import janitor
+import helpers
 
 def extract_player_data(json):
     """
@@ -253,7 +254,7 @@ def extract_team_data(json):
     team_data_two = json['tm']['2']
     
     # Keys to exclude from team data
-    keys_to_remove = ['coachDetails', 'assistcoach1Details', 'assistcoach2Details', 'pl', 'shot', 'scoring', 'lds']
+    keys_to_remove = ['coachDetails', 'assistcoach1Details', 'assistcoach2Details', 'pl', 'shot', 'scoring', 'lds', 'full_score', 'points', 'asstSep', 'tot_sPoints']
     for key in keys_to_remove:
         team_data_one.pop(key, None)  # avoids KeyError if key doesn't exist
         team_data_two.pop(key, None)
@@ -281,22 +282,21 @@ def extract_team_data(json):
         'tot_s_free_throws_made': 'free_throws_made',
         'tot_s_free_throws_attempted': 'free_throws_attempted',
         'tot_s_free_throws_percentage': 'free_throw_percentage',
-        'tot_s_rebounds_defensive': 'rebounds_defensive',
-        'tot_s_rebounds_offensive': 'rebounds_offensive',
+        'tot_s_rebounds_defensive': 'defensive_rebounds',
+        'tot_s_rebounds_offensive': 'offensive_rebounds',
         'tot_s_rebounds_total': 'rebounds',
         'tot_s_assists': 'assists',
         'tot_s_turnovers': 'turnovers',
         'tot_s_steals': 'steals',
         'tot_s_blocks': 'blocks',
         'tot_s_blocks_received': 'blocks_received',
-        'tot_s_fouls_personal': 'fouls_personal',
+        'tot_s_fouls_personal': 'personal_fouls',
         'tot_s_fouls_on': 'fouls_drawn',
-        'tot_s_fouls_total': 'fouls_total',
-        'tot_s_points': 'points',
+        'tot_s_fouls_total': 'total_fouls',
         'tot_s_points_from_turnovers': 'points_from_turnovers',
-        'tot_s_points_second_chance': 'points_second_chance',
-        'tot_s_points_fast_break': 'points_fast_break',
-        'tot_s_bench_points': 'points_bench',
+        'tot_s_points_second_chance': 'second_chance_points',
+        'tot_s_points_fast_break': 'fast_break_points',
+        'tot_s_bench_points': 'bench_points',
         'tot_s_points_in_the_paint': 'points_in_the_paint',
         'tot_s_time_leading': 'time_leading',
         'tot_s_biggest_lead': 'biggest_lead',
@@ -305,25 +305,63 @@ def extract_team_data(json):
         'tot_s_times_scores_level': 'times_scores_level',
         'tot_s_fouls_team': 'team_fouls',
         'tot_s_rebounds_team': 'team_rebounds',
-        'tot_s_rebounds_team_defensive': 'team_rebounds_defensive',
-        'tot_s_rebounds_team_offensive': 'team_rebounds_offensive',
+        'tot_s_rebounds_team_defensive': 'team_defensive_rebounds',
+        'tot_s_rebounds_team_offensive': 'team_offensive_rebounds',
         'tot_s_turnovers_team': 'team_turnovers',
+        'tot_eff_1': 'team_index_rating',
+        'tot_eff_2': 'team_index_rating_2',
+        'tot_eff_3': 'team_index_rating_3',
+        'tot_eff_4': 'team_index_rating_4',
+        'tot_eff_5': 'team_index_rating_5',
+        'tot_eff_6': 'team_index_rating_6',
+        'tot_eff_7': 'team_index_rating_7',
+        'name': 'team_name',
+        'tot_s_minutes': 'minutes',
+        'score': 'team_score',
+        'assistcoach1': 'assistant_coach_1',
+        'assistcoach2': 'assistant_coach_2',
+        'coach': 'head_coach',
+        'name_international': 'international_team_name',
+        'short_name_international': 'international_short_name',
+        'code_international': 'international_code',
+        'p1_score': 'period_1_score',
+        'p2_score': 'period_2_score',
+        'p3_score': 'period_3_score',
+        'p4_score': 'period_4_score',
+        'fouls': 'bonus_fouls',
+
     }
-    
-    # Apply column renaming
     team_df = team_df.rename(columns=column_mapping)
 
     # Data type conversions
     dtype_mapping = {
         'game_id': int,
-        'tot_eff_1': float,
-        'tot_eff_2': float,
-        'tot_eff_3': float,
-        'tot_eff_4': float,
-        'tot_eff_5': float,
-        'tot_eff_6': float,
-        'tot_eff_7': float,
+        'team_index_rating': float,
+        'team_index_rating_2': float,
+        'team_index_rating_3': float,
+        'team_index_rating_4': float,
+        'team_index_rating_5': float,
+        'team_index_rating_6': float,
+        'team_index_rating_7': float,
     }
+    team_df = team_df.astype(dtype_mapping)
+
+    # Reorder columns
+    column_order = ['game_id', 'team_name', 'short_name', 'code', 'team_score', 'minutes', 'field_goals_made', 'field_goals_attempted', 'field_goal_percentage',
+                    'two_point_field_goals_made', 'two_point_field_goals_attempted', 'two_point_percentage', 'three_point_field_goals_made', 'three_point_field_goals_attempted',
+                    'three_point_percentage', 'free_throws_made', 'free_throws_attempted', 'free_throw_percentage', 'offensive_rebounds', 'defensive_rebounds',
+                    'rebounds', 'assists', 'steals', 'turnovers', 'blocks', 'blocks_received', 'personal_fouls', 'fouls_drawn', 'total_fouls', 'bonus_fouls',
+                    'points_in_the_paint', 'second_chance_points', 'points_from_turnovers', 'bench_points', 'fast_break_points', 'team_index_rating', 
+                    'team_index_rating_2', 'team_index_rating_3', 'team_index_rating_4', 'team_index_rating_5', 'team_index_rating_6', 'team_index_rating_7',
+                    'team_fouls', 'team_turnovers', 'team_rebounds', 'team_defensive_rebounds', 'team_offensive_rebounds', 'period_1_score', 'period_2_score',
+                    'period_3_score', 'period_4_score', 'biggest_lead', 'biggest_scoring_run', 'time_leading', 'lead_changes', 'times_scores_level', 'timeouts',
+                    'head_coach', 'assistant_coach_1', 'assistant_coach_2', 'international_team_name', 'international_short_name', 'international_code', 'logo',
+                    'logo_t_url', 'logo_t_size', 'logo_t_height', 'logo_t_width', 'logo_t_bytes', 'logo_s_url', 'logo_s_size', 'logo_s_height', 'logo_s_width',
+                    'logo_s_bytes',]
+    team_df = team_df[column_order]
+
+    team_df['minutes'] = team_df['minutes'].apply(helpers.normalize_time)
+    team_df["biggest_lead"] = team_df["biggest_lead"].fillna(0)
 
     return team_df
 
