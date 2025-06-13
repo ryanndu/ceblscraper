@@ -136,11 +136,30 @@ def extract_official_data(json):
     official_df = pd.json_normalize(json['officials'].values()).clean_names(case_type="snake")
     official_df['game_id'] = json['game_id']
 
+    # Convert column names
+    column_mapping = {
+        'family_name': 'last_name',
+        'name': 'official_name',
+        'family_name_initial': 'last_name_initial',
+        'international_family_name': 'international_last_name',
+        'international_family_name_initial': 'international_last_name_initial',
+    }
+    official_df = official_df.rename(columns=column_mapping)
+
     # Convert data types
     dtype_mapping = {
         'game_id': int,
     }
     official_df = official_df.astype(dtype_mapping)
+
+    # Change column order 
+    column_order = [
+        'game_id', 'official_name', 'first_name', 'last_name', 'scoreboard_name',
+        'first_name_initial', 'last_name_initial', 'international_first_name', 
+        'international_first_name_initial', 'international_last_name', 
+        'international_last_name_initial'
+    ]
+    official_df = official_df[column_order] 
 
     return official_df
 
