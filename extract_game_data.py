@@ -310,8 +310,59 @@ def extract_coach_data(json):
         A DataFrame containing the coach data for a specific game
     """
     
-    coach_df_list = []
+    coach_df = pd.DataFrame()
     
+    for team_num in ['1', '2']:
+        team_data = json['tm'][team_num]
+        team_name = team_data['name']
+        
+        coaches_data = [
+            ('coachDetails', 'Head Coach'),
+            ('assistcoach1Details', 'Assistant Coach'),
+            ('assistcoach2Details', 'Assistant Coach')
+        ]
+
+        for key, coach_type in coaches_data:
+            if key in team_data and team_data[key] is not None:
+                coach_record = pd.json_normalize(team_data[key])
+                coach_record['team_name'] = team_name
+                coach_record['coach_type'] = coach_type
+                coach_df = pd.concat([coach_df, coach_record], ignore_index=True)
+    
+    if coach_df.empty:
+        return coach_df
+    
+    coach_df = coach_df.clean_names(case_type="snake")
+    coach_df['game_id'] = json['game_id']
+
+    column_mapping = {
+        'family_name': 'last_name',
+        'family_name_initial': 'last_name_initial',
+        'international_family_name': 'international_last_name',
+        'international_family_name_initial': 'international_last_name_initial',
+    }
+    coach_df = coach_df.rename(columns=column_mapping)
+    
+    for coaches in coach_df:
+        coach_df['coach_name'] = coach_df['first_name'] + ' ' + coach_df['last_name']
+    
+    dtype_mapping = {
+        'game_id': int,
+    }
+    
+    for col, dtype in dtype_mapping.items():
+        coach_df[col] = coach_df[col].astype(dtype)
+    
+    column_order = [
+        'game_id', 'team_name', 'coach_name', 'coach_type',
+        'first_name', 'first_name_initial', 'last_name', 'last_name_initial',
+        'international_first_name', 'international_first_name_initial', 
+        'international_last_name', 'international_last_name_initial',
+        'scoreboard_name',
+    ]
+    coach_df = coach_df[column_order]
+    
+    return coach_df    
     # Extract coach data from both teams
     for team_num in ['1', '2']:
         team_data = json['tm'][team_num]
